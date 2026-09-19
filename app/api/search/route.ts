@@ -30,12 +30,14 @@ export async function GET(request: Request) {
             return NextResponse.json({ albums });
         }
 
-        // Search for multiple matching artists
-        if (artistsMode && query) {
+        // Search for multiple matching artists. Followed-artist browsing
+        // doesn't require a query — an empty query lists the full,
+        // alphabetized following list.
+        if (artistsMode && (query || scope === 'following')) {
             const artists =
                 scope === 'following'
-                    ? await searchFollowedArtists(token, query)
-                    : await searchArtists(token, query);
+                    ? await searchFollowedArtists(token, query ?? '')
+                    : await searchArtists(token, query!);
             return NextResponse.json({ artists });
         }
 

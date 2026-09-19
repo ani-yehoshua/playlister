@@ -170,38 +170,32 @@ export default function PlaylistPage() {
                 </div>
             ) : (
                 <div className='space-y-0.5'>
-                    <div className='grid grid-cols-[auto_1fr_1fr] gap-4 px-3 py-2 text-xs text-muted-foreground uppercase tracking-wider'>
-                        <span className='w-8 text-center'>#</span>
-                        <span>Title</span>
-                        <span className='hidden sm:block'>Artist</span>
-                    </div>
-                    <div className='h-px bg-border mb-1' />
                     {tracks.map((track, i) => (
                         <div
                             key={`${track.track_id}-${i}`}
-                            className='grid grid-cols-[auto_1fr_1fr] gap-4 px-3 py-2 rounded-md hover:bg-muted/40 transition-colors items-center'>
-                            <span className='w-8 text-center text-sm text-muted-foreground'>
+                            className='flex items-center gap-3 px-2 py-2 rounded-md hover:bg-muted/40 transition-colors'>
+                            <span className='w-6 text-center text-sm text-muted-foreground shrink-0'>
                                 {i + 1}
                             </span>
-                            <div className='flex items-center gap-3 min-w-0'>
-                                <div className='relative w-10 h-10 shrink-0 rounded overflow-hidden bg-muted'>
-                                    {track.track_album_cover && (
-                                        <Image
-                                            src={track.track_album_cover}
-                                            alt={track.track_name}
-                                            fill
-                                            className='object-cover'
-                                            sizes='40px'
-                                        />
-                                    )}
-                                </div>
-                                <span className='text-sm font-medium break-words leading-snug'>
-                                    {track.track_name}
-                                </span>
+                            <div className='relative w-10 h-10 shrink-0 rounded overflow-hidden bg-muted'>
+                                {track.track_album_cover && (
+                                    <Image
+                                        src={track.track_album_cover}
+                                        alt={track.track_name}
+                                        fill
+                                        className='object-cover'
+                                        sizes='40px'
+                                    />
+                                )}
                             </div>
-                            <span className='text-sm text-muted-foreground break-words leading-snug min-w-0 hidden sm:block'>
-                                {track.artist_name}
-                            </span>
+                            <div className='flex-1 min-w-0'>
+                                <p className='text-sm font-medium break-words leading-snug'>
+                                    {track.track_name}
+                                </p>
+                                <p className='text-xs text-muted-foreground mt-0.5'>
+                                    {track.artist_name}
+                                </p>
+                            </div>
                         </div>
                     ))}
                 </div>

@@ -255,8 +255,9 @@ export async function searchFollowedArtists(t: string, query: string) {
 
     const q = query.trim().toLowerCase();
     const matches = q ? all.filter(a => a.name.toLowerCase().includes(q)) : all;
+    matches.sort((a, b) => a.name.localeCompare(b.name));
 
-    return matches.slice(0, 8).map(a => ({
+    return matches.map(a => ({
         id: a.id,
         name: a.name,
         image:
