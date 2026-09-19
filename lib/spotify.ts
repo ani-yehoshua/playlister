@@ -271,6 +271,18 @@ export async function searchFollowedArtists(t: string, query: string) {
     }));
 }
 
+/**
+ * Spotify's release_date_precision can be 'year', 'month', or 'day', so
+ * release_date itself may be "2020", "2020-05", or "2020-05-15". Pad it out
+ * to a full YYYY-MM-DD so two releases can be compared/sorted to the day.
+ */
+function toPreciseDate(releaseDate: string, precision?: string): string {
+    if (precision === 'day' || releaseDate.length === 10) return releaseDate;
+    if (precision === 'month' || releaseDate.length === 7)
+        return `${releaseDate}-01`;
+    return `${releaseDate.slice(0, 4)}-01-01`;
+}
+
 export async function getArtistAlbums(
     t: string,
     artistId: string,
@@ -298,6 +310,10 @@ export async function getArtistAlbums(
                 album_type: a.album_type,
                 total_tracks: a.total_tracks,
                 release_date: year,
+                release_date_precise: toPreciseDate(
+                    a.release_date,
+                    a.release_date_precision,
+                ),
                 songs: [],
             });
         }
@@ -308,66 +324,13 @@ export async function getArtistAlbums(
     const map = new Map<string, SpotifyAlbum>();
     for (const a of all) {
         const ex = map.get(a.album_name);
-        if (!ex || a.release_date > ex.release_date) map.set(a.album_name, a);
+        if (!ex || a.release_date_precise > ex.release_date_precise)
+            map.set(a.album_name, a);
     }
 
     return [...map.values()].sort((a, b) => {
         if (a.album_type !== b.album_type)
             return a.album_type === 'album' ? -1 : 1;
-        return b.release_date.localeCompare(a.release_date);
-    });
-}
-
-export async function searchArtistAlbums(
-    t: string,
-    query: string,
-): Promise<SpotifyAlbum[]> {
-    const artistSearch = await sf(
-        `/search?q=${encodeURIComponent(query)}&type=artist&limit=1`,
-        t,
-    );
-    const artist = artistSearch?.artists?.items?.[0];
-    if (!artist) throw new Error('ARTIST_NOT_FOUND');
-
-    const all: SpotifyAlbum[] = [];
-    let offset = 0;
-    while (true) {
-        const data = await sf(
-            `/artists/${artist.id}/albums?include_groups=album,single&limit=50&offset=${offset}`,
-            t,
-        );
-        const items = data?.items ?? [];
-        if (!items.length) break;
-        for (const a of items) {
-            if (a.album_type === 'compilation') continue;
-            const year =
-                a.release_date.length === 4
-                    ? a.release_date
-                    : new Date(a.release_date).getFullYear().toString();
-            all.push({
-                album_name: a.name,
-                album_id: a.id,
-                album_cover_image:
-                    a.images?.[2]?.url ?? a.images?.[0]?.url ?? '',
-                album_type: a.album_type,
-                total_tracks: a.total_tracks,
-                release_date: year,
-                songs: [],
-            });
-        }
-        offset += items.length;
-        if (offset >= 500) break;
-    }
-
-    const map = new Map<string, SpotifyAlbum>();
-    for (const a of all) {
-        const ex = map.get(a.album_name);
-        if (!ex || a.release_date > ex.release_date) map.set(a.album_name, a);
-    }
-
-    return [...map.values()].sort((a, b) => {
-        if (a.album_type !== b.album_type)
-            return a.album_type === 'album' ? -1 : 1;
-        return b.release_date.localeCompare(a.release_date);
+        return b.release_date_precise.localeCompare(a.release_date_precise);
     });
 }

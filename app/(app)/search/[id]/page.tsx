@@ -243,9 +243,10 @@ export default function SearchPage() {
             );
             setAlbums(loaded);
 
-            // Default order: oldest release first, newest last.
+            // Default order: oldest release first, newest last — sorted to
+            // the day so same-year releases still land in the right spot.
             const ordered = [...loaded].sort((a, b) =>
-                a.release_date.localeCompare(b.release_date),
+                a.release_date_precise.localeCompare(b.release_date_precise),
             );
             const trackIds = ordered.flatMap(a =>
                 a.songs.map(s => s.song_id),

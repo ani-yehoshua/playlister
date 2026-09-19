@@ -28,6 +28,9 @@ export interface SpotifyAlbum {
     album_type: string;
     total_tracks: number;
     release_date: string;
+    /** Full YYYY-MM-DD release date (padded to the 1st when Spotify only
+     *  reports year/month precision) — sortable to the day. */
+    release_date_precise: string;
     songs: SpotifySong[];
 }
 
