@@ -13,7 +13,13 @@ export const SCOPE = [
     'playlist-modify-private',
     'playlist-modify-public',
     'ugc-image-upload',
-    'user-follow-read',
+    // 'user-follow-read' and 'user-follow-modify' — needed for "Artists I
+    // Follow" search and for unfollowing artists from within the app, but
+    // Spotify rejects the whole auth request with invalid_scope until this
+    // app's quota extension request (pending) is approved with these
+    // scopes included. Re-add both once that comes through.
+    // 'user-follow-read',
+    // 'user-follow-modify',
 ].join(' ');
 
 export function getAuthHeader() {
