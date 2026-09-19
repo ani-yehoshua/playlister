@@ -20,7 +20,6 @@ export default function EditPlaylistPage() {
     const [description, setDescription] = useState("");
     const [tracks, setTracks] = useState<SpotifyTrack[]>([]);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-    const [selectAll, setSelectAll] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [saveOpen, setSaveOpen] = useState(false);
@@ -72,10 +71,14 @@ export default function EditPlaylistPage() {
     }
 
     function toggleAll(checked: boolean) {
-        setSelectAll(checked);
-        setSelectedIds(
-            checked ? new Set(tracks.map(t => t.track_id)) : new Set(),
-        );
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            for (const t of filteredTracks) {
+                if (checked) next.add(t.track_id);
+                else next.delete(t.track_id);
+            }
+            return next;
+        });
     }
 
     function scrollToTop() {
@@ -218,7 +221,7 @@ export default function EditPlaylistPage() {
                             value={filterQuery}
                             onChange={e => setFilterQuery(e.target.value)}
                             placeholder='Filter by song or artist…'
-                            className='flex h-10 w-full rounded-md border border-input bg-transparent pl-9 pr-9 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+                            className='search-field flex h-10 w-full rounded-md border border-input bg-transparent pl-9 pr-9 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
                         />
                         {filterQuery && (
                             <button
@@ -238,13 +241,25 @@ export default function EditPlaylistPage() {
                                   ? `${filteredTracks.length} result${filteredTracks.length !== 1 ? "s" : ""}`
                                   : `${tracks.length} track${tracks.length !== 1 ? "s" : ""}`}
                         </p>
-                        {!filterQuery && (
+                        {filteredTracks.length > 0 && (
                             <div className='flex items-center gap-2 text-sm text-muted-foreground'>
                                 <Checkbox.Root
                                     id='selectAll'
-                                    checked={selectAll}
+                                    checked={
+                                        filteredTracks.every(t =>
+                                            selectedIds.has(t.track_id),
+                                        )
+                                            ? true
+                                            : filteredTracks.some(t =>
+                                                    selectedIds.has(
+                                                        t.track_id,
+                                                    ),
+                                                )
+                                              ? "indeterminate"
+                                              : false
+                                    }
                                     onCheckedChange={v => toggleAll(Boolean(v))}
-                                    className='h-4 w-4 rounded-sm border border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground flex items-center justify-center'>
+                                    className='h-4 w-4 rounded-sm border border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-primary-foreground flex items-center justify-center'>
                                     <Checkbox.Indicator>
                                         <Check className='h-3 w-3' />
                                     </Checkbox.Indicator>
@@ -252,7 +267,7 @@ export default function EditPlaylistPage() {
                                 <label
                                     htmlFor='selectAll'
                                     className='cursor-pointer select-none'>
-                                    All
+                                    {filterQuery ? "All results" : "All"}
                                 </label>
                             </div>
                         )}

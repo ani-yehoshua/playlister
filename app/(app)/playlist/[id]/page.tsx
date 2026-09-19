@@ -195,11 +195,11 @@ export default function PlaylistPage() {
                                         />
                                     )}
                                 </div>
-                                <span className='text-sm font-medium truncate'>
+                                <span className='text-sm font-medium break-words leading-snug'>
                                     {track.track_name}
                                 </span>
                             </div>
-                            <span className='text-sm text-muted-foreground truncate hidden sm:block'>
+                            <span className='text-sm text-muted-foreground break-words leading-snug min-w-0 hidden sm:block'>
                                 {track.artist_name}
                             </span>
                         </div>

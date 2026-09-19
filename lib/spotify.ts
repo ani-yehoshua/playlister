@@ -13,6 +13,7 @@ export const SCOPE = [
     'playlist-modify-private',
     'playlist-modify-public',
     'ugc-image-upload',
+    'user-follow-read',
 ].join(' ');
 
 export function getAuthHeader() {
@@ -218,6 +219,44 @@ export async function searchArtists(t: string, query: string) {
     );
     const items = data?.artists?.items ?? [];
     return items.map((a: any) => ({
+        id: a.id,
+        name: a.name,
+        image:
+            a.images?.[2]?.url ??
+            a.images?.[1]?.url ??
+            a.images?.[0]?.url ??
+            '',
+        followers: a.followers?.total
+            ? new Intl.NumberFormat().format(a.followers.total)
+            : '',
+    }));
+}
+
+interface RawSpotifyArtist {
+    id: string;
+    name: string;
+    images?: { url: string }[];
+    followers?: { total: number };
+}
+
+export async function searchFollowedArtists(t: string, query: string) {
+    const all: RawSpotifyArtist[] = [];
+    let after: string | undefined;
+    while (true) {
+        const data = await sf(
+            `/me/following?type=artist&limit=50${after ? `&after=${after}` : ""}`,
+            t,
+        );
+        const items: RawSpotifyArtist[] = data?.artists?.items ?? [];
+        all.push(...items);
+        after = data?.artists?.cursors?.after ?? undefined;
+        if (!after || !items.length) break;
+    }
+
+    const q = query.trim().toLowerCase();
+    const matches = q ? all.filter(a => a.name.toLowerCase().includes(q)) : all;
+
+    return matches.slice(0, 8).map(a => ({
         id: a.id,
         name: a.name,
         image:

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import {
     getValidAccessToken,
     searchArtists,
+    searchFollowedArtists,
     getArtistAlbums,
     getAlbumTracks,
 } from '@/lib/spotify';
@@ -10,6 +11,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q');
     const artistsMode = searchParams.get('artists') === 'true';
+    const scope = searchParams.get('scope') === 'following' ? 'following' : 'all';
     const artistId = searchParams.get('artistId');
     const albumId = searchParams.get('albumId');
 
@@ -30,7 +32,10 @@ export async function GET(request: Request) {
 
         // Search for multiple matching artists
         if (artistsMode && query) {
-            const artists = await searchArtists(token, query);
+            const artists =
+                scope === 'following'
+                    ? await searchFollowedArtists(token, query)
+                    : await searchArtists(token, query);
             return NextResponse.json({ artists });
         }
 

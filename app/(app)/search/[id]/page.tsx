@@ -14,7 +14,10 @@ import {
     CheckCircle2,
     Music,
     X,
+    Check,
+    ListMusic,
 } from "lucide-react";
+import * as Checkbox from "@radix-ui/react-checkbox";
 import type { SpotifyAlbum, SpotifySong } from "@/types";
 
 interface Artist {
@@ -29,9 +32,12 @@ type AlbumWithSongs = SpotifyAlbum & {
     songsLoaded: boolean;
 };
 
+type SearchScope = "all" | "following";
+
 export default function SearchPage() {
     const { id: playlistId } = useParams<{ id: string }>();
     const [query, setQuery] = useState("");
+    const [scope, setScope] = useState<SearchScope>("all");
     const [artists, setArtists] = useState<Artist[]>([]);
     const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
     const [albums, setAlbums] = useState<AlbumWithSongs[]>([]);
@@ -43,6 +49,8 @@ export default function SearchPage() {
     const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
     const [addingIds, setAddingIds] = useState<Set<string>>(new Set());
     const [playlistName, setPlaylistName] = useState("");
+    const [addingAll, setAddingAll] = useState(false);
+    const [releaseOrder, setReleaseOrder] = useState(false);
 
     useEffect(() => {
         fetch(`/api/playlist/${playlistId}`)
@@ -50,9 +58,7 @@ export default function SearchPage() {
             .then(d => setPlaylistName(d.playlist?.name ?? ""));
     }, [playlistId]);
 
-    async function handleSearch(e: React.FormEvent<HTMLFormElement>) {
-        e.preventDefault();
-        const q = query.trim();
+    async function runSearch(q: string, searchScope: SearchScope) {
         if (!q) return;
         setSearching(true);
         setSearchError("");
@@ -61,7 +67,7 @@ export default function SearchPage() {
         setAlbums([]);
         try {
             const res = await fetch(
-                `/api/search?artists=true&q=${encodeURIComponent(q)}`,
+                `/api/search?artists=true&scope=${searchScope}&q=${encodeURIComponent(q)}`,
             );
             const data = await res.json();
             if (!res.ok) {
@@ -70,11 +76,26 @@ export default function SearchPage() {
             }
             setArtists(data.artists ?? []);
             if ((data.artists ?? []).length === 0) {
-                setSearchError("No artists found. Try a different name.");
+                setSearchError(
+                    searchScope === "following"
+                        ? "No followed artists match. Try a different name."
+                        : "No artists found. Try a different name.",
+                );
             }
         } finally {
             setSearching(false);
         }
+    }
+
+    async function handleSearch(e: React.FormEvent<HTMLFormElement>) {
+        e.preventDefault();
+        await runSearch(query.trim(), scope);
+    }
+
+    function changeScope(next: SearchScope) {
+        setScope(next);
+        const q = query.trim();
+        if (q) runSearch(q, next);
     }
 
     async function selectArtist(artist: Artist) {
@@ -185,6 +206,64 @@ export default function SearchPage() {
         }
     }
 
+    async function addAllForArtist() {
+        if (addingAll || albums.length === 0) return;
+        setAddingAll(true);
+        try {
+            // Load songs for every album that hasn't been fetched yet.
+            const loaded: AlbumWithSongs[] = await Promise.all(
+                albums.map(async (album): Promise<AlbumWithSongs> => {
+                    if (album.songsLoaded) return album;
+                    const res = await fetch(
+                        `/api/search?albumId=${album.album_id}`,
+                    );
+                    const data = await res.json();
+                    return {
+                        ...album,
+                        songs: (data.songs ?? []) as SpotifySong[],
+                        songsLoaded: true,
+                    };
+                }),
+            );
+            setAlbums(loaded);
+
+            const ordered = releaseOrder
+                ? [...loaded].sort((a, b) =>
+                      a.release_date.localeCompare(b.release_date),
+                  )
+                : loaded;
+            const trackIds = ordered.flatMap(a =>
+                a.songs.map(s => s.song_id),
+            );
+
+            setAddingIds(prev => {
+                const n = new Set(prev);
+                for (const a of loaded) n.add(a.album_id);
+                return n;
+            });
+            await fetch(`/api/playlist/${playlistId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ addTrackIds: trackIds }),
+            });
+            setAddedIds(prev => {
+                const n = new Set(prev);
+                for (const a of loaded) {
+                    n.add(a.album_id);
+                    for (const s of a.songs) n.add(s.song_id);
+                }
+                return n;
+            });
+        } finally {
+            setAddingIds(prev => {
+                const n = new Set(prev);
+                for (const a of albums) n.delete(a.album_id);
+                return n;
+            });
+            setAddingAll(false);
+        }
+    }
+
     return (
         <div className='max-w-2xl mx-auto space-y-6 pb-12'>
             {/* Header */}
@@ -228,8 +307,22 @@ export default function SearchPage() {
                         }}
                         placeholder='Search for an artist…'
                         autoComplete='off'
-                        className='flex h-10 w-full rounded-md border border-input bg-transparent pl-9 pr-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+                        className='search-field flex h-10 w-full rounded-md border border-input bg-transparent pl-9 pr-9 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
                     />
+                    {query && (
+                        <button
+                            type='button'
+                            onClick={() => {
+                                setQuery("");
+                                setArtists([]);
+                                setSelectedArtist(null);
+                                setAlbums([]);
+                                setSearchError("");
+                            }}
+                            className='absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground'>
+                            <X className='w-4 h-4' />
+                        </button>
+                    )}
                 </div>
                 <Button
                     type='submit'
@@ -241,6 +334,30 @@ export default function SearchPage() {
                     )}
                 </Button>
             </form>
+
+            {/* Search scope */}
+            <div className='flex items-center gap-1 rounded-md border border-border/50 bg-muted/30 p-1 w-fit'>
+                <button
+                    type='button'
+                    onClick={() => changeScope("all")}
+                    className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                        scope === "all"
+                            ? "bg-background shadow-sm text-foreground"
+                            : "text-muted-foreground hover:text-foreground"
+                    }`}>
+                    All of Spotify
+                </button>
+                <button
+                    type='button'
+                    onClick={() => changeScope("following")}
+                    className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                        scope === "following"
+                            ? "bg-background shadow-sm text-foreground"
+                            : "text-muted-foreground hover:text-foreground"
+                    }`}>
+                    Artists I Follow
+                </button>
+            </div>
 
             {searchError && (
                 <p className='text-sm text-destructive'>{searchError}</p>
@@ -334,6 +451,40 @@ export default function SearchPage() {
                         title='Change artist'>
                         <X className='w-4 h-4' />
                     </button>
+                </div>
+            )}
+
+            {/* Add all by this artist */}
+            {selectedArtist && !loadingAlbums && albums.length > 0 && (
+                <div className='flex items-center justify-between gap-3 p-3 rounded-lg border border-border/50 bg-muted/30'>
+                    <div className='flex items-center gap-2 text-sm text-muted-foreground'>
+                        <Checkbox.Root
+                            id='releaseOrder'
+                            checked={releaseOrder}
+                            onCheckedChange={v => setReleaseOrder(Boolean(v))}
+                            className='h-4 w-4 rounded-sm border border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground flex items-center justify-center'>
+                            <Checkbox.Indicator>
+                                <Check className='h-3 w-3' />
+                            </Checkbox.Indicator>
+                        </Checkbox.Root>
+                        <label
+                            htmlFor='releaseOrder'
+                            className='cursor-pointer select-none'>
+                            Release order
+                        </label>
+                    </div>
+                    <Button
+                        size='sm'
+                        variant='outline'
+                        onClick={addAllForArtist}
+                        disabled={addingAll}>
+                        {addingAll ? (
+                            <Loader2 className='w-4 h-4 mr-1.5 animate-spin' />
+                        ) : (
+                            <ListMusic className='w-4 h-4 mr-1.5' />
+                        )}
+                        Add All
+                    </Button>
                 </div>
             )}
 
